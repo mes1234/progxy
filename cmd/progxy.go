@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"time"
 
 	"github.com/fsnotify/fsnotify"
 	log "github.com/sirupsen/logrus"
@@ -15,6 +16,8 @@ func main() {
 	viper.WatchConfig()
 	viper.OnConfigChange(func(e fsnotify.Event) {
 		log.Debug("Config file changed:", e.Name)
+		port := viper.GetInt("port")
+		log.WithField("port", port).Info("Started progxy")
 	})
 
 	err := viper.ReadInConfig()
@@ -31,4 +34,7 @@ func main() {
 	log.SetOutput(os.Stdout)
 
 	log.WithField("port", port).Info("Started progxy")
+
+	time.Sleep(1000 * time.Second)
+
 }

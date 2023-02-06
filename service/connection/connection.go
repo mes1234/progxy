@@ -4,33 +4,21 @@ import (
 	"net"
 	"net/url"
 
-	"github.com/google/uuid"
+	"github.com/mes1234/progxy/internal/dto"
 )
 
-type client struct {
-	id uuid.UUID
-}
-
-func (c *client) Close() error {
-	return nil
-}
-
-type Client interface {
-	Close() error
-}
-
 type ConnectionService interface {
-	Attach(address url.URL, handler net.Conn) (Client, error)
+	Attach(address url.URL, handler net.Conn) (dto.Client, error)
 }
 
 type connectionService struct {
-	clients []client
+	clients []dto.Client
 }
 
 func NewConnectionSerivce() ConnectionService {
 	return &connectionService{}
 }
 
-func (cs *connectionService) Attach(address url.URL, handler net.Conn) (Client, error) {
-	return &client{}, nil
+func (cs *connectionService) Attach(address url.URL, handler net.Conn) (dto.Client, error) {
+	return dto.NewClient(), nil
 }

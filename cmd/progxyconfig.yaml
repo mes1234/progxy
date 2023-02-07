@@ -1,1 +1,13 @@
-port: 123
+destinations:
+  - dest1 :
+      proxied:
+        host: "127.0.0.1"
+        port:  8080
+      port: 9000
+      name: "simple HTTP server"
+  - dest2 :
+      proxied:
+        host: "127.0.0.1"
+        port:  8081
+      port: 9001
+      name: "bulk HTTP server"

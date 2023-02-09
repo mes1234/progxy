@@ -2,7 +2,6 @@ package configuration
 
 import (
 	"os"
-	"sync"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/mes1234/progxy/internal/dto"
@@ -10,75 +9,77 @@ import (
 	"github.com/spf13/viper"
 )
 
-var (
-	config dto.Config
-	once   sync.Once
-	logger logrus.Logger
-)
+func (cs *configurationService) setupLogger() {
 
-func init() {
-	once.Do(func() {
-		ReadConfig()
-		SetupLogger()
-	})
-}
+	cs.logger = *logrus.New()
 
-func SetupLogger() {
-
-	logger = *logrus.New()
-
-	logger.SetFormatter(&logrus.TextFormatter{
+	cs.logger.SetFormatter(&logrus.TextFormatter{
 		DisableColors: false,
 		FullTimestamp: true,
 	})
-	logger.SetOutput(os.Stdout)
+	cs.logger.SetOutput(os.Stdout)
 
-	logger.SetLevel(logrus.DebugLevel)
+	cs.logger.SetLevel(logrus.DebugLevel)
 
 }
 
-func ReadConfig() {
-	viper.AddConfigPath(".")
+type RealoadCallback func(e fsnotify.Event)
+
+func NoActionCallback(e fsnotify.Event) {}
+
+var DefaultPath = "."
+
+func (cs *configurationService) Init(path string, realoadCallback RealoadCallback) {
+
+	cs.readConfig(path, realoadCallback)
+	cs.setupLogger()
+
+}
+
+func (cs *configurationService) readConfig(path string, realoadCallback RealoadCallback) {
+
+	if path != "" {
+		viper.AddConfigPath(path)
+	} else {
+		viper.AddConfigPath(".")
+	}
+
 	viper.SetConfigFile("progxyconfig.yaml")
 	viper.SetConfigType("yaml")
 	viper.WatchConfig()
-	viper.OnConfigChange(func(e fsnotify.Event) {
-		logger.Debug("Config file changed:", e.Name)
-		port := viper.GetInt("port")
-		logger.WithField("port", port).Info("Started progxy")
-	})
+	viper.OnConfigChange(realoadCallback)
 
 	err := viper.ReadInConfig()
 	if err != nil {
 		panic(err)
 	}
 
-	err = viper.Unmarshal(&config)
+	err = viper.Unmarshal(&cs.config)
 
 	if err != nil {
-		logger.Panic("Unable to read Configuration")
+		cs.logger.Panic("Unable to read Configuration")
 	}
 }
 
 type ConfigurationService interface {
 	GetDestinations() *map[string]dto.Destination
 	GetLogger() *logrus.Logger
+	Init(path string, realoadCallback RealoadCallback)
 }
 
 type configurationService struct {
-	configuration dto.Config
+	logger logrus.Logger
+	config dto.Config
 }
 
 func (cs *configurationService) GetDestinations() *map[string]dto.Destination {
-	return &cs.configuration.Destintations
+	return &cs.config.Destintations
 }
 
-func (cs configurationService) GetLogger() *logrus.Logger {
-	return &logger
+func (cs *configurationService) GetLogger() *logrus.Logger {
+	return &cs.logger
 }
 
 func NewConfigurationService() ConfigurationService {
-	return &configurationService{
-		configuration: config,
-	}
+	return &configurationService{}
 }

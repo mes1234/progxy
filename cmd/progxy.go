@@ -8,9 +8,13 @@ import (
 
 func main() {
 
-	config := configuration.NewConfigurationService().GetDestinations()
+	cs := configuration.NewConfigurationService()
 
-	log := configuration.NewConfigurationService().GetLogger()
+	cs.Init(configuration.DefaultPath, configuration.NoActionCallback)
+
+	config := cs.GetDestinations()
+
+	log := cs.GetLogger()
 
 	log.Debug("Got config ", len(*config))
 

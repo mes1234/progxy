@@ -9,6 +9,8 @@ import (
 	"github.com/mes1234/progxy/internal/dto"
 )
 
+const bufferSize = 1024
+
 // TcpAdapter listen to connections and
 type TcpAdapter interface {
 }
@@ -54,35 +56,37 @@ func (tcpA *tcpAdapter) handle(proxiedAddr string) {
 	}
 }
 
+// Should be used as goroutine otherwise it will never release thread
+func readAndForward(out chan<- []byte, reader io.Reader) {
+	buf := make([]byte, bufferSize)
+	for {
+		n := 0
+		for n == 0 {
+			n, _ = reader.Read(buf)
+			//TODO error handling
+		}
+		out <- buf
+	}
+}
+
+// Should be used as goroutine otherwise it will never release thread
+func ForwardToWriter(in <-chan []byte, writer io.Writer) {
+	for {
+		data := <-in
+		writer.Write(data)
+	}
+}
+
 func createChannelFromReaderWriter(rw io.ReadWriter) (in chan []byte, out chan []byte) {
 
-	out = make(chan []byte)
-	in = make(chan []byte)
+	out = make(chan []byte, bufferSize)
+	in = make(chan []byte, bufferSize)
 
-	go func() {
-		buf := make([]byte, 2)
-		for {
-			n := 0
-			for n == 0 {
-				n, err := rw.Read(buf)
+	// Read data from Reader and push to channel
+	go readAndForward(out, rw)
 
-				if err != nil {
-					panic(n)
-				}
-			}
-
-			out <- buf
-		}
-	}()
-
-	go func() {
-		for {
-			select {
-			case data := <-in:
-				rw.Write(data)
-			}
-		}
-	}()
+	// Forward data from in channel to Writer
+	go ForwardToWriter(in, rw)
 
 	return in, out
 }

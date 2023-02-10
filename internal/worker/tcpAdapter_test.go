@@ -21,7 +21,9 @@ func TestTcpAdapterShallShuffleDataFromClientToProxyTest(t *testing.T) {
 }
 
 func dummylistenFunc(network, address string) (net.Listener, error) {
-	return &dummyListner{}, nil
+	return &dummyListner{
+		amount: 1,
+	}, nil
 }
 
 func dummydnsLookupFunc(host string) ([]net.IP, error) {
@@ -32,17 +34,25 @@ func dummydnsLookupFunc(host string) ([]net.IP, error) {
 }
 
 func dummyDialFunc(network string, raddr string) (net.Conn, error) {
-	return &dummyConn{}, nil
+
+	ticker := time.NewTicker(10000 * time.Millisecond)
+
+	return &dummyConn{
+		ticker: *ticker,
+	}, nil
 }
 
 type dummyListner struct {
+	amount int
 }
 
 type dummyConn struct {
+	ticker time.Ticker
 }
 
 func (dc *dummyConn) Read(b []byte) (n int, err error) {
 
+	<-dc.ticker.C
 	for i := range b {
 		b[i] = 0xFF
 	}
@@ -83,6 +93,12 @@ func (dc *dummyConn) SetWriteDeadline(t time.Time) error {
 }
 
 func (dl *dummyListner) Accept() (net.Conn, error) {
+	if dl.amount > 0 {
+
+		dl.amount--
+		return &dummyConn{}, nil
+	}
+	time.Sleep(1000 * time.Second)
 	return &dummyConn{}, nil
 }
 

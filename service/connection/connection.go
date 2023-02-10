@@ -1,14 +1,12 @@
 package connection
 
 import (
-	"net"
-	"net/url"
-
 	"github.com/mes1234/progxy/internal/dto"
 )
 
+// ConnectionService
 type ConnectionService interface {
-	Attach(address url.URL, handler net.Conn) (dto.Client, error)
+	Attach(address dto.Proxied) (dto.Client, error)
 }
 
 type connectionService struct {
@@ -19,6 +17,6 @@ func NewConnectionSerivce() ConnectionService {
 	return &connectionService{}
 }
 
-func (cs *connectionService) Attach(address url.URL, handler net.Conn) (dto.Client, error) {
+func (cs *connectionService) Attach(address dto.Proxied) (dto.Client, error) {
 	return dto.NewClient(), nil
 }

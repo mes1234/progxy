@@ -18,8 +18,8 @@ func TestShufflerShouldZeroAllBytes(t *testing.T) {
 
 	sut.Attach(ZeroAllBytes)
 
-	//Assert
 	time.Sleep(1 * time.Millisecond)
+	//Assert
 	for i, v := range data {
 		if v != 0x00 {
 			t.Fatalf("Expected all data to be 0x00 but got %d at position %d", v, i)
@@ -41,6 +41,7 @@ func TestShufflerShouldZeroAllAndAddOneBytes(t *testing.T) {
 
 	//Assert
 	time.Sleep(1 * time.Millisecond)
+
 	for i, v := range data {
 		if v != 0x01 {
 			t.Fatalf("Expected all data to be 0x01 but got %d at position %d", v, i)

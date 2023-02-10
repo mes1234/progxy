@@ -14,14 +14,22 @@ type TcpAdapter interface {
 }
 
 type tcpAdapter struct {
-	listner net.Listener
-	proxied net.Conn
+	listner  net.Listener
+	dialFunc DialFunc
 }
 
-func (tcpA *tcpAdapter) start(clientsListner net.Listener, proxiedAddr *net.TCPAddr) {
+type DialFunc func(network string, raddr string) (net.Conn, error)
+type ListenFunc func(network, address string) (net.Listener, error)
+type DnsLookupFunc func(host string) ([]net.IP, error)
+
+func (tcpA *tcpAdapter) start(clientsListner net.Listener, proxiedAddr string) {
 
 	tcpA.listner = clientsListner
 
+	tcpA.handle(proxiedAddr)
+}
+
+func (tcpA *tcpAdapter) handle(proxiedAddr string) {
 	for {
 		// create context to close this proxy
 		ctx := context.Background()
@@ -30,7 +38,7 @@ func (tcpA *tcpAdapter) start(clientsListner net.Listener, proxiedAddr *net.TCPA
 		clientConn, _ := tcpA.listner.Accept()
 
 		// connection to talk with proxied
-		proxiedConn, _ := net.DialTCP("tcp", nil, proxiedAddr)
+		proxiedConn, _ := tcpA.dialFunc("tcp", proxiedAddr)
 
 		clientInChan, clientOutChan := createChannelFromReaderWriter(clientConn)
 
@@ -47,19 +55,54 @@ func (tcpA *tcpAdapter) start(clientsListner net.Listener, proxiedAddr *net.TCPA
 }
 
 func createChannelFromReaderWriter(rw io.ReadWriter) (in chan []byte, out chan []byte) {
-	return make(chan []byte), make(chan []byte)
+
+	out = make(chan []byte)
+	in = make(chan []byte)
+
+	go func() {
+		buf := make([]byte, 2)
+		for {
+			n := 0
+			for n == 0 {
+				n, err := rw.Read(buf)
+
+				if err != nil {
+					panic(n)
+				}
+			}
+
+			out <- buf
+		}
+	}()
+
+	go func() {
+		for {
+			select {
+			case data := <-in:
+				rw.Write(data)
+			}
+		}
+	}()
+
+	return in, out
 }
 
-func NewTcpAdaper(proxied dto.Proxied, port int) TcpAdapter {
+func NewTcpAdaper(
+	proxied dto.Proxied,
+	port int,
+	listenFunc ListenFunc,
+	dialFunc DialFunc,
+	dnsLookupFunc DnsLookupFunc) TcpAdapter {
 
 	// based on provided proxied address and port get address to proxied service
-	proxiedAddr := GetProxiedAddr(proxied)
-
+	proxiedAddr := getProxiedAddr(proxied, dnsLookupFunc)
 	// start accepting clients on provided common port
-	listen, _ := net.Listen("tcp", "localhost"+":"+fmt.Sprint(port))
+	listen, _ := listenFunc("tcp", "localhost"+":"+fmt.Sprint(port))
 
 	// create tcpAdapter which will setup pipelines for clients
-	adapter := tcpAdapter{}
+	adapter := tcpAdapter{
+		dialFunc: dialFunc,
+	}
 
 	// bootstrap bounding and shuffling data between client and proxied
 	go adapter.start(listen, proxiedAddr)
@@ -67,15 +110,15 @@ func NewTcpAdaper(proxied dto.Proxied, port int) TcpAdapter {
 	return &adapter
 }
 
-func GetProxiedAddr(proxied dto.Proxied) *net.TCPAddr {
+func getProxiedAddr(proxied dto.Proxied, dnsLookupFunc DnsLookupFunc) string {
 
 	// get IP for HOST
-	proxiedIp, _ := net.LookupIP(proxied.Host)
+	proxiedIp, _ := dnsLookupFunc(proxied.Host)
 
 	// create IPAddr based on first found match
 	addr := net.IPAddr{
 		IP: proxiedIp[0],
 	}
-	return &net.TCPAddr{IP: addr.IP, Port: proxied.Port}
+	return addr.IP.String() + ":" + fmt.Sprint(proxied.Port)
 
 }

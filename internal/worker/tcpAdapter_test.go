@@ -12,18 +12,32 @@ import (
 func TestTcpAdapterShallShuffleDataFromClientToProxyTest(t *testing.T) {
 
 	//Arrange
-	_ = worker.NewTcpAdaper(dto.Proxied{}, 1111, dummylistenFunc, dummyDialFunc, dummydnsLookupFunc)
+	// Buffer which shall be written from client to proxied
+	bufOut := make([]byte, 1024)
+
+	valueToSendFromClientToProxied := byte(0xAA)
+
+	_ = worker.NewTcpAdaper(dto.Proxied{}, 1111, generateListenFunc(&bufOut), generateLDialFunc(valueToSendFromClientToProxied), dummydnsLookupFunc)
+
 	//Act
+	// Allow to shuffling start
+	time.Sleep(1 * time.Second)
 
 	//Assert
-	//TODO do some assertions
-	time.Sleep(100 * time.Second)
+	for i := range bufOut {
+		if bufOut[i] != valueToSendFromClientToProxied {
+			t.Fatalf("Expected data %v got %v", valueToSendFromClientToProxied, bufOut[i])
+		}
+	}
 }
 
-func dummylistenFunc(network, address string) (net.Listener, error) {
-	return &dummyListner{
-		amount: 1,
-	}, nil
+func generateListenFunc(bufOut *[]byte) worker.ListenFunc {
+	return func(network, address string) (net.Listener, error) {
+		return &dummyListner{
+			amount: 1,
+			bufOut: *bufOut,
+		}, nil
+	}
 }
 
 func dummydnsLookupFunc(host string) ([]net.IP, error) {
@@ -33,20 +47,26 @@ func dummydnsLookupFunc(host string) ([]net.IP, error) {
 	return ips, nil
 }
 
-func dummyDialFunc(network string, raddr string) (net.Conn, error) {
+func generateLDialFunc(value byte) worker.DialFunc {
+	return func(network string, raddr string) (net.Conn, error) {
 
-	ticker := time.NewTicker(10000 * time.Millisecond)
+		ticker := time.NewTicker(1 * time.Millisecond)
 
-	return &dummyConn{
-		ticker: *ticker,
-	}, nil
+		return &dummyConn{
+			ticker: *ticker,
+			value:  value,
+		}, nil
+	}
 }
 
 type dummyListner struct {
 	amount int
+	bufOut []byte
 }
 
 type dummyConn struct {
+	bufOut []byte
+	value  byte
 	ticker time.Ticker
 }
 
@@ -54,16 +74,14 @@ func (dc *dummyConn) Read(b []byte) (n int, err error) {
 
 	<-dc.ticker.C
 	for i := range b {
-		b[i] = 0xFF
+		b[i] = dc.value
 	}
 
 	return len(b), nil
 }
 
 func (dc *dummyConn) Write(b []byte) (n int, err error) {
-	for i := range b {
-		b[i] = 0xFF
-	}
+	copy(dc.bufOut, b)
 
 	return len(b), nil
 }
@@ -94,9 +112,10 @@ func (dc *dummyConn) SetWriteDeadline(t time.Time) error {
 
 func (dl *dummyListner) Accept() (net.Conn, error) {
 	if dl.amount > 0 {
-
 		dl.amount--
-		return &dummyConn{}, nil
+		return &dummyConn{
+			bufOut: dl.bufOut,
+		}, nil
 	}
 	time.Sleep(1000 * time.Second)
 	return &dummyConn{}, nil

@@ -100,6 +100,7 @@ func NewTcpAdaper(
 
 	// based on provided proxied address and port get address to proxied service
 	proxiedAddr := getProxiedAddr(proxied, dnsLookupFunc)
+
 	// start accepting clients on provided common port
 	listen, _ := listenFunc("tcp", "localhost"+":"+fmt.Sprint(port))
 

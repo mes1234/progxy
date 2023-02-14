@@ -117,6 +117,8 @@ func (dl *dummyListner) Accept() (net.Conn, error) {
 			bufOut: dl.bufOut,
 		}, nil
 	}
+
+	// When amount is exceeded wait long for next accept to not overhelm handler
 	time.Sleep(1000 * time.Second)
 	return &dummyConn{}, nil
 }

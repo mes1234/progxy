@@ -9,39 +9,16 @@ import (
 	"github.com/mes1234/progxy/internal/worker"
 )
 
-func TestTcpAdapterShallShuffleDataFromClientToProxy(t *testing.T) {
+func TestTcpAdapterShallShuffleDataFromProxiedToClient(t *testing.T) {
 
 	//Arrange
 	// Buffer which shall be written from client to proxied
 	bufOut := make([]byte, 1024)
 
-	valueToSendFromClientToProxied := byte(0xAA)
-
-	// TODO most likly it is mixed and actually it is sending From Proxied to Client
-	_ = worker.NewTcpAdaper(dto.Proxied{}, 1111, generateListenFuncWithBuf(&bufOut), generateDialFuncWithValue(valueToSendFromClientToProxied), dummydnsLookupFunc)
-
-	//Act
-	// Allow to shuffling start
-	time.Sleep(1 * time.Second)
-
-	//Assert
-	for i := range bufOut {
-		if bufOut[i] != valueToSendFromClientToProxied {
-			t.Fatalf("Expected data %v got %v", valueToSendFromClientToProxied, bufOut[i])
-		}
-	}
-}
-
-func TestTcpAdapterShallShuffleDataFromProxiedToClient(t *testing.T) {
-
-	//Arrange
-	//Buffer which shall be written from proxied to client
-	bufOut := make([]byte, 1024)
-
 	valueToSendFromProxiedToClient := byte(0xAA)
 
-	// TODO this is wrong
-	_ = worker.NewTcpAdaper(dto.Proxied{}, 1111, generateListenFuncWithValue(valueToSendFromProxiedToClient), generateDialFuncWithBuf(&bufOut), dummydnsLookupFunc)
+	_ = worker.NewTcpAdaper(dto.Proxied{}, 1111, generateListenFuncWithBuf(&bufOut), generateDialFuncWithValue(valueToSendFromProxiedToClient), dummydnsLookupFunc)
+
 	//Act
 	// Allow to shuffling start
 	time.Sleep(1 * time.Second)
@@ -59,15 +36,6 @@ func generateListenFuncWithBuf(bufOut *[]byte) worker.ListenFunc {
 		return &dummyListner{
 			amount: 1,
 			bufOut: *bufOut,
-		}, nil
-	}
-}
-
-func generateListenFuncWithValue(value byte) worker.ListenFunc {
-	return func(network, address string) (net.Listener, error) {
-		return &dummyListner{
-			amount: 1,
-			value:  value,
 		}, nil
 	}
 }

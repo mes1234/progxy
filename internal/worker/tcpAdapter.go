@@ -42,16 +42,24 @@ func (tcpA *tcpAdapter) handle(proxiedAddr string) {
 		// connection to talk with proxied
 		proxiedConn, _ := tcpA.dialFunc("tcp", proxiedAddr)
 
+		// clientInChan allow to write to client
+		// clientOutChan gets data from client
 		clientInChan, clientOutChan := createChannelFromReaderWriter(clientConn)
 
+		// proxiedInChan allow to write to proxied
+		// proxiedOutChan gets data from proxied
 		proxiedInChan, proxiedOutChan := createChannelFromReaderWriter(proxiedConn)
 
+		//Shuffler which will process data from client -> proxied
 		clientShuffler, _ := NewShuffler(clientOutChan, ctx)
 
-		clientShuffler.Attach(CreateWriteToChannelProcessorFunc(proxiedInChan))
-
+		// Shuffler which will process data from proxied -> client
 		proxiedShuffler, _ := NewShuffler(proxiedOutChan, ctx)
 
+		// Pass data from client to proxied
+		clientShuffler.Attach(CreateWriteToChannelProcessorFunc(proxiedInChan))
+
+		// Pass data from proxied to client
 		proxiedShuffler.Attach(CreateWriteToChannelProcessorFunc(clientInChan))
 	}
 }

@@ -9,7 +9,7 @@ import (
 	"github.com/mes1234/progxy/internal/worker"
 )
 
-func TestTcpAdapterShallShuffleDataFromClientToProxyTest(t *testing.T) {
+func TestTcpAdapterShallShuffleDataFromClientToProxy(t *testing.T) {
 
 	//Arrange
 	// Buffer which shall be written from client to proxied
@@ -17,7 +17,8 @@ func TestTcpAdapterShallShuffleDataFromClientToProxyTest(t *testing.T) {
 
 	valueToSendFromClientToProxied := byte(0xAA)
 
-	_ = worker.NewTcpAdaper(dto.Proxied{}, 1111, generateListenFunc(&bufOut), generateLDialFunc(valueToSendFromClientToProxied), dummydnsLookupFunc)
+	// TODO most likly it is mixed and actually it is sending From Proxied to Client
+	_ = worker.NewTcpAdaper(dto.Proxied{}, 1111, generateListenFuncWithBuf(&bufOut), generateDialFuncWithValue(valueToSendFromClientToProxied), dummydnsLookupFunc)
 
 	//Act
 	// Allow to shuffling start
@@ -31,11 +32,42 @@ func TestTcpAdapterShallShuffleDataFromClientToProxyTest(t *testing.T) {
 	}
 }
 
-func generateListenFunc(bufOut *[]byte) worker.ListenFunc {
+func TestTcpAdapterShallShuffleDataFromProxiedToClient(t *testing.T) {
+
+	//Arrange
+	//Buffer which shall be written from proxied to client
+	bufOut := make([]byte, 1024)
+
+	valueToSendFromProxiedToClient := byte(0xAA)
+
+	// TODO this is wrong
+	_ = worker.NewTcpAdaper(dto.Proxied{}, 1111, generateListenFuncWithValue(valueToSendFromProxiedToClient), generateDialFuncWithBuf(&bufOut), dummydnsLookupFunc)
+	//Act
+	// Allow to shuffling start
+	time.Sleep(1 * time.Second)
+
+	//Assert
+	for i := range bufOut {
+		if bufOut[i] != valueToSendFromProxiedToClient {
+			t.Fatalf("Expected data %v got %v", valueToSendFromProxiedToClient, bufOut[i])
+		}
+	}
+}
+
+func generateListenFuncWithBuf(bufOut *[]byte) worker.ListenFunc {
 	return func(network, address string) (net.Listener, error) {
 		return &dummyListner{
 			amount: 1,
 			bufOut: *bufOut,
+		}, nil
+	}
+}
+
+func generateListenFuncWithValue(value byte) worker.ListenFunc {
+	return func(network, address string) (net.Listener, error) {
+		return &dummyListner{
+			amount: 1,
+			value:  value,
 		}, nil
 	}
 }
@@ -47,7 +79,7 @@ func dummydnsLookupFunc(host string) ([]net.IP, error) {
 	return ips, nil
 }
 
-func generateLDialFunc(value byte) worker.DialFunc {
+func generateDialFuncWithValue(value byte) worker.DialFunc {
 	return func(network string, raddr string) (net.Conn, error) {
 
 		ticker := time.NewTicker(1 * time.Millisecond)
@@ -59,9 +91,22 @@ func generateLDialFunc(value byte) worker.DialFunc {
 	}
 }
 
+func generateDialFuncWithBuf(bufOut *[]byte) worker.DialFunc {
+	return func(network string, raddr string) (net.Conn, error) {
+
+		ticker := time.NewTicker(1 * time.Millisecond)
+
+		return &dummyConn{
+			ticker: *ticker,
+			bufOut: *bufOut,
+		}, nil
+	}
+}
+
 type dummyListner struct {
 	amount int
 	bufOut []byte
+	value  byte
 }
 
 type dummyConn struct {
@@ -115,6 +160,7 @@ func (dl *dummyListner) Accept() (net.Conn, error) {
 		dl.amount--
 		return &dummyConn{
 			bufOut: dl.bufOut,
+			value:  dl.value,
 		}, nil
 	}
 

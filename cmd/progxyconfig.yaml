@@ -2,7 +2,7 @@ destinations:
   - dest1 :
       proxied:
         host: "127.0.0.1"
-        port:  8080
+        port:  5500
       port: 9000
       name: "simple HTTP server"
   - dest2 :

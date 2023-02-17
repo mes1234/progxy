@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"fmt"
 	"time"
 )
 
@@ -10,6 +11,12 @@ type ProcessorFunc func(buffer []byte)
 func CreateWriteToChannelProcessorFunc(channel chan<- []byte) ProcessorFunc {
 	return func(buffer []byte) {
 		channel <- buffer
+	}
+}
+
+func CreateWriteToConsoleProcessorFunc(direction string) ProcessorFunc {
+	return func(buffer []byte) {
+		fmt.Printf("DATA TRANSFER :%v \n %v\n", direction, string(buffer))
 	}
 }
 

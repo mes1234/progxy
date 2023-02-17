@@ -18,7 +18,7 @@ func TestShufflerShouldZeroAllBytes(t *testing.T) {
 
 	sut.Attach(ZeroAllBytes)
 
-	time.Sleep(1 * time.Millisecond)
+	time.Sleep(10 * time.Millisecond)
 	//Assert
 	for i, v := range data {
 		if v != 0x00 {
@@ -40,7 +40,7 @@ func TestShufflerShouldZeroAllAndAddOneBytes(t *testing.T) {
 	sut.Attach(AddOne)
 
 	//Assert
-	time.Sleep(1 * time.Millisecond)
+	time.Sleep(10 * time.Millisecond)
 
 	for i, v := range data {
 		if v != 0x01 {

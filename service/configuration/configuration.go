@@ -62,7 +62,7 @@ func (cs *configurationService) readConfig(path string, realoadCallback RealoadC
 }
 
 type ConfigurationService interface {
-	GetDestinations() *map[string]dto.Destination
+	GetDestinations() map[string]dto.Destination
 	GetLogger() *logrus.Logger
 	Init(path string, realoadCallback RealoadCallback)
 }
@@ -72,8 +72,8 @@ type configurationService struct {
 	config dto.Config
 }
 
-func (cs *configurationService) GetDestinations() *map[string]dto.Destination {
-	return &cs.config.Destintations
+func (cs *configurationService) GetDestinations() map[string]dto.Destination {
+	return cs.config.Destintations
 }
 
 func (cs *configurationService) GetLogger() *logrus.Logger {

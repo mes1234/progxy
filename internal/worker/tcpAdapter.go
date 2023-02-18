@@ -39,41 +39,46 @@ func (tcpA *tcpAdapter) handle(proxiedAddr string) {
 		// connection to talk with client
 		clientConn, _ := tcpA.listner.Accept()
 
-		// connection to talk with proxied
-		proxiedConn, _ := tcpA.dialFunc("tcp", proxiedAddr)
-
-		// clientInChan allow to write to client
-		// clientOutChan gets data from client
-		clientInChan, clientOutChan, clientWg := CreateChannelFromReaderWriter(clientConn)
-
-		// proxiedInChan allow to write to proxied
-		// proxiedOutChan gets data from proxied
-		proxiedInChan, proxiedOutChan, proxiedWg := CreateChannelFromReaderWriter(proxiedConn)
-
-		//Shuffler which will process data from client -> proxied
-		clientShuffler, _ := NewShuffler(clientOutChan, ctx)
-
-		// Shuffler which will process data from proxied -> client
-		proxiedShuffler, _ := NewShuffler(proxiedOutChan, ctx)
-
-		// Pass data from client to proxied
-		clientShuffler.Attach(CreateWriteToConsoleProcessorFunc("client -> proxied"))
-		clientShuffler.Attach(CreateWriteToChannelProcessorFunc(proxiedInChan))
-
-		// Pass data from proxied to client
-		proxiedShuffler.Attach(CreateWriteToConsoleProcessorFunc("proxied -> client"))
-		proxiedShuffler.Attach(CreateWriteToChannelProcessorFunc(clientInChan))
-
-		go WaitToClose("client", clientWg, clientConn)
-		go WaitToClose("proxied", proxiedWg, proxiedConn)
+		go start(tcpA, proxiedAddr, clientConn, ctx)
 	}
 }
 
+func start(tcpA *tcpAdapter, proxiedAddr string, clientConn net.Conn, ctx context.Context) {
+
+	// connection to talk with proxied
+	proxiedConn, _ := tcpA.dialFunc("tcp", proxiedAddr)
+
+	// clientInChan allow to write to client
+	// clientOutChan gets data from client
+	clientInChan, clientOutChan, clientWg := CreateChannelFromReaderWriter("client", clientConn)
+
+	// proxiedInChan allow to write to proxied
+	// proxiedOutChan gets data from proxied
+	proxiedInChan, proxiedOutChan, proxiedWg := CreateChannelFromReaderWriter("proxied", proxiedConn)
+
+	//Shuffler which will process data from client -> proxied
+	clientShuffler, _ := NewShuffler(clientOutChan, ctx)
+
+	// Shuffler which will process data from proxied -> client
+	proxiedShuffler, _ := NewShuffler(proxiedOutChan, ctx)
+
+	// Pass data from client to proxied
+	clientShuffler.Attach(CreateWriteToConsoleProcessorFunc("client -> proxied"))
+	clientShuffler.Attach(CreateWriteToChannelProcessorFunc(proxiedInChan))
+
+	// Pass data from proxied to client
+	proxiedShuffler.Attach(CreateWriteToConsoleProcessorFunc("proxied -> client"))
+	proxiedShuffler.Attach(CreateWriteToChannelProcessorFunc(clientInChan))
+
+	go WaitToClose("client", clientWg, clientConn)
+	go WaitToClose("proxied", proxiedWg, proxiedConn)
+}
+
 // Should be run as goroutine otherwise will block
-func WaitToClose(who string, waiter *sync.WaitGroup, client net.Conn) {
+func WaitToClose(who string, waiter *sync.WaitGroup, conn net.Conn) {
 	waiter.Wait()
 	fmt.Printf("Closed connection by %v\n", who)
-	client.Close()
+	conn.Close()
 }
 
 func NewTcpAdaper(

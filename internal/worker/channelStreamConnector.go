@@ -7,7 +7,7 @@ import (
 )
 
 // Should be used as goroutine otherwise it will never release thread
-func readAndForward(out chan<- []byte, reader io.Reader, wg *sync.WaitGroup) {
+func readAndForward(out channelWrapper, reader io.Reader, wg *sync.WaitGroup) {
 	defer wg.Done()
 	readBuf := make([]byte, bufferSize)
 	for {
@@ -18,16 +18,16 @@ func readAndForward(out chan<- []byte, reader io.Reader, wg *sync.WaitGroup) {
 		if n != 0 {
 			outBuf := make([]byte, n)
 			copy(outBuf, readBuf)
-			out <- outBuf
+			out.channel <- outBuf
 		}
 
 	}
 }
 
 // Should be used as goroutine otherwise it will never release thread
-func forwardToWriter(in <-chan []byte, writer io.Writer) {
+func forwardToWriter(in channelWrapper, writer io.Writer) {
 	for {
-		data := <-in
+		data := <-in.channel
 		n, err := writer.Write(data)
 		if err != nil {
 			fmt.Printf("read %v data and failed", n)
@@ -39,19 +39,30 @@ func forwardToWriter(in <-chan []byte, writer io.Writer) {
 // CreateChannelFromReaderWriter
 // performs Read on rw and push it to out chan
 // retrieve from in chan and performs Write
-func CreateChannelFromReaderWriter(rw io.ReadWriter) (in chan []byte, out chan []byte, wg *sync.WaitGroup) {
+func CreateChannelFromReaderWriter(description string, rw io.ReadWriter) (in chan []byte, out chan []byte, wg *sync.WaitGroup) {
 
 	wg = &sync.WaitGroup{}
 	wg.Add(1)
 
-	out = make(chan []byte, 1)
-	in = make(chan []byte, 1)
+	outWrapper := channelWrapper{
+		channel:     make(chan []byte, 1),
+		description: "out channel for " + description,
+	}
+	inWrapper := channelWrapper{
+		channel:     make(chan []byte, 1),
+		description: "in channel for " + description,
+	}
 
 	// Read data from Reader and push to channel
-	go readAndForward(out, rw, wg)
+	go readAndForward(outWrapper, rw, wg)
 
 	// Forward data from in channel to Writer
-	go forwardToWriter(in, rw)
+	go forwardToWriter(inWrapper, rw)
 
-	return in, out, wg
+	return inWrapper.channel, outWrapper.channel, wg
+}
+
+type channelWrapper struct {
+	channel     chan []byte
+	description string
 }

@@ -10,7 +10,9 @@ type ProcessorFunc func(buffer []byte)
 
 func CreateWriteToChannelProcessorFunc(channel chan<- []byte) ProcessorFunc {
 	return func(buffer []byte) {
-		channel <- buffer
+		localBuf := make([]byte, len(buffer))
+		copy(localBuf, buffer)
+		channel <- localBuf
 	}
 }
 

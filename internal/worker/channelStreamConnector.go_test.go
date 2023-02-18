@@ -18,7 +18,7 @@ func TestStreamShouldReadOneTimeAndPutItToOutChanTime(t *testing.T) {
 	dummyRW := newDummyStreamReadWriter(dataChunk)
 
 	//Act
-	_, outChan, _ := worker.CreateChannelFromReaderWriter(dummyRW)
+	_, outChan, _ := worker.CreateChannelFromReaderWriter("test", dummyRW)
 
 	//Assert
 	data := <-outChan
@@ -42,7 +42,7 @@ func TestStreamShouldReadMoreThanOneTimeAndPutItToOutChanTime(t *testing.T) {
 	dummyRW := newDummyStreamReadWriter(dataChunk)
 
 	//Act
-	_, outChan, _ := worker.CreateChannelFromReaderWriter(dummyRW)
+	_, outChan, _ := worker.CreateChannelFromReaderWriter("test", dummyRW)
 
 	time.Sleep(1 * time.Second)
 
@@ -68,7 +68,7 @@ func TestStreamShouldGetDataFromInChannelAndPassItToWriter(t *testing.T) {
 	}
 	//Act
 	dummyRW := newDummyStreamReadWriterWithAssertions(dataChunk, t)
-	inChan, _, _ := worker.CreateChannelFromReaderWriter(dummyRW)
+	inChan, _, _ := worker.CreateChannelFromReaderWriter("test", dummyRW)
 
 	for _, dataChunkRow := range dataChunk {
 		inChan <- dataChunkRow

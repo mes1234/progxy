@@ -59,18 +59,6 @@ func generateDialFuncWithValue(value byte) worker.DialFunc {
 	}
 }
 
-func generateDialFuncWithBuf(bufOut *[]byte) worker.DialFunc {
-	return func(network string, raddr string) (net.Conn, error) {
-
-		ticker := time.NewTicker(1 * time.Millisecond)
-
-		return &dummyConn{
-			ticker: *ticker,
-			bufOut: *bufOut,
-		}, nil
-	}
-}
-
 type dummyListner struct {
 	amount int
 	bufOut []byte

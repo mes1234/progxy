@@ -51,12 +51,15 @@ func (s *shuffler) processChunk(data []byte) {
 }
 
 func (s *shuffler) start(input <-chan []byte) {
-	select {
-	case data := <-input:
-		go s.processChunk(data)
-	case <-s.myContext.Done():
-		return
+	for {
+		select {
+		case data := <-input:
+			s.processChunk(data)
+		case <-s.myContext.Done():
+			return
+		}
 	}
+
 }
 
 func NewShuffler(input <-chan []byte, ctx context.Context) (Shufller, context.CancelFunc) {

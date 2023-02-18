@@ -3,7 +3,6 @@ package worker
 import (
 	"context"
 	"fmt"
-	"io"
 	"net"
 	"sync"
 
@@ -43,19 +42,13 @@ func (tcpA *tcpAdapter) handle(proxiedAddr string) {
 		// connection to talk with proxied
 		proxiedConn, _ := tcpA.dialFunc("tcp", proxiedAddr)
 
-		clientWg := new(sync.WaitGroup)
-		clientWg.Add(1)
-
 		// clientInChan allow to write to client
 		// clientOutChan gets data from client
-		clientInChan, clientOutChan := createChannelFromReaderWriter(clientConn, clientWg)
-
-		proxiedWg := new(sync.WaitGroup)
-		proxiedWg.Add(1)
+		clientInChan, clientOutChan, clientWg := CreateChannelFromReaderWriter(clientConn)
 
 		// proxiedInChan allow to write to proxied
 		// proxiedOutChan gets data from proxied
-		proxiedInChan, proxiedOutChan := createChannelFromReaderWriter(proxiedConn, proxiedWg)
+		proxiedInChan, proxiedOutChan, proxiedWg := CreateChannelFromReaderWriter(proxiedConn)
 
 		//Shuffler which will process data from client -> proxied
 		clientShuffler, _ := NewShuffler(clientOutChan, ctx)
@@ -71,8 +64,8 @@ func (tcpA *tcpAdapter) handle(proxiedAddr string) {
 		proxiedShuffler.Attach(CreateWriteToConsoleProcessorFunc("proxied -> client"))
 		proxiedShuffler.Attach(CreateWriteToChannelProcessorFunc(clientInChan))
 
-		//go WaitToClose("client", clientWg, clientConn)
-		//go WaitToClose("proxied", proxiedWg, proxiedConn)
+		go WaitToClose("client", clientWg, clientConn)
+		go WaitToClose("proxied", proxiedWg, proxiedConn)
 	}
 }
 
@@ -81,51 +74,6 @@ func WaitToClose(who string, waiter *sync.WaitGroup, client net.Conn) {
 	waiter.Wait()
 	fmt.Printf("Closed connection by %v\n", who)
 	client.Close()
-}
-
-// Should be used as goroutine otherwise it will never release thread
-func readAndForward(out chan<- []byte, reader io.Reader, wg *sync.WaitGroup) {
-	defer wg.Done()
-	readBuf := make([]byte, bufferSize)
-	for {
-
-		n, err := reader.Read(readBuf)
-		if err != nil {
-			return
-		}
-		if n != 0 {
-			outBuf := make([]byte, n)
-			copy(outBuf, readBuf)
-			out <- outBuf
-		}
-
-	}
-}
-
-// Should be used as goroutine otherwise it will never release thread
-func ForwardToWriter(in <-chan []byte, writer io.Writer) {
-	for {
-		data := <-in
-		n, err := writer.Write(data)
-		if err != nil {
-			fmt.Printf("read %v data and failed", n)
-			return
-		}
-	}
-}
-
-func createChannelFromReaderWriter(rw io.ReadWriter, wg *sync.WaitGroup) (in chan []byte, out chan []byte) {
-
-	out = make(chan []byte, 1024)
-	in = make(chan []byte, 1024)
-
-	// Read data from Reader and push to channel
-	go readAndForward(out, rw, wg)
-
-	// Forward data from in channel to Writer
-	go ForwardToWriter(in, rw)
-
-	return in, out
 }
 
 func NewTcpAdaper(

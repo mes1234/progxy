@@ -1,5 +1,6 @@
 {
     "gopls": {
         "ui.semanticTokens": true
-    }
+    },
+    "editor.minimap.enabled": false
 }

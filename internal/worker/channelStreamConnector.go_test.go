@@ -1,6 +1,7 @@
 package worker_test
 
 import (
+	"context"
 	"io"
 	"testing"
 	"time"
@@ -18,7 +19,7 @@ func TestStreamShouldReadOneTimeAndPutItToOutChanTime(t *testing.T) {
 	dummyRW := newDummyStreamReadWriter(dataChunk)
 
 	//Act
-	_, outChan, _ := worker.CreateChannelFromReaderWriter("test", dummyRW)
+	_, outChan, _ := worker.CreateChannelFromReaderWriter("test", dummyRW, context.TODO())
 
 	//Assert
 	data := <-outChan
@@ -42,7 +43,7 @@ func TestStreamShouldReadMoreThanOneTimeAndPutItToOutChanTime(t *testing.T) {
 	dummyRW := newDummyStreamReadWriter(dataChunk)
 
 	//Act
-	_, outChan, _ := worker.CreateChannelFromReaderWriter("test", dummyRW)
+	_, outChan, _ := worker.CreateChannelFromReaderWriter("test", dummyRW, context.TODO())
 
 	time.Sleep(1 * time.Second)
 
@@ -68,7 +69,7 @@ func TestStreamShouldGetDataFromInChannelAndPassItToWriter(t *testing.T) {
 	}
 	//Act
 	dummyRW := newDummyStreamReadWriterWithAssertions(dataChunk, t)
-	inChan, _, _ := worker.CreateChannelFromReaderWriter("test", dummyRW)
+	inChan, _, _ := worker.CreateChannelFromReaderWriter("test", dummyRW, context.TODO())
 
 	for _, dataChunkRow := range dataChunk {
 		inChan <- dataChunkRow

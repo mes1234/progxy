@@ -45,40 +45,43 @@ func (tcpA *tcpAdapter) handle(proxiedAddr string) {
 
 func start(tcpA *tcpAdapter, proxiedAddr string, clientConn net.Conn, ctx context.Context) {
 
+	localCtx, cancelFunc := context.WithCancel(ctx)
+
 	// connection to talk with proxied
 	proxiedConn, _ := tcpA.dialFunc("tcp", proxiedAddr)
 
 	// clientInChan allow to write to client
 	// clientOutChan gets data from client
-	clientInChan, clientOutChan, clientWg := CreateChannelFromReaderWriter("client", clientConn)
+	clientInChan, clientOutChan, clientWg := CreateChannelFromReaderWriter("client", clientConn, localCtx)
 
 	// proxiedInChan allow to write to proxied
 	// proxiedOutChan gets data from proxied
-	proxiedInChan, proxiedOutChan, proxiedWg := CreateChannelFromReaderWriter("proxied", proxiedConn)
+	proxiedInChan, proxiedOutChan, proxiedWg := CreateChannelFromReaderWriter("proxied", proxiedConn, localCtx)
 
 	//Shuffler which will process data from client -> proxied
-	clientShuffler, _ := NewShuffler(clientOutChan, ctx)
+	clientShuffler, _ := NewShuffler(clientOutChan, localCtx)
 
 	// Shuffler which will process data from proxied -> client
-	proxiedShuffler, _ := NewShuffler(proxiedOutChan, ctx)
+	proxiedShuffler, _ := NewShuffler(proxiedOutChan, localCtx)
 
 	// Pass data from client to proxied
-	clientShuffler.Attach(CreateWriteToConsoleProcessorFunc("client -> proxied"))
+	//clientShuffler.Attach(CreateWriteToConsoleProcessorFunc("client -> proxied"))
 	clientShuffler.Attach(CreateWriteToChannelProcessorFunc(proxiedInChan))
 
 	// Pass data from proxied to client
-	proxiedShuffler.Attach(CreateWriteToConsoleProcessorFunc("proxied -> client"))
+	//proxiedShuffler.Attach(CreateWriteToConsoleProcessorFunc("proxied -> client"))
 	proxiedShuffler.Attach(CreateWriteToChannelProcessorFunc(clientInChan))
 
-	go WaitToClose("client", clientWg, clientConn)
-	go WaitToClose("proxied", proxiedWg, proxiedConn)
+	go WaitToClose("client", clientWg, clientConn, cancelFunc)
+	go WaitToClose("proxied", proxiedWg, proxiedConn, cancelFunc)
 }
 
 // Should be run as goroutine otherwise will block
-func WaitToClose(who string, waiter *sync.WaitGroup, conn net.Conn) {
+func WaitToClose(who string, waiter *sync.WaitGroup, conn net.Conn, cancelFunc context.CancelFunc) {
 	waiter.Wait()
 	fmt.Printf("Closed connection by %v\n", who)
 	conn.Close()
+	cancelFunc()
 }
 
 func NewTcpAdaper(

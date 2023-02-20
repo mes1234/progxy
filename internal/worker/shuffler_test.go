@@ -59,6 +59,13 @@ func TestShufflerShouldAndAddOneBytesInOrderedWay(t *testing.T) {
 		{0xDD, 0xDD, 0xDD, 0xDD, 0xDD},
 	}
 
+	copyOfData := [][]byte{
+		{0xAA, 0xAA},
+		{0xBB, 0xBB, 0xBB},
+		{0xCC, 0xCC, 0xCC, 0xCC},
+		{0xDD, 0xDD, 0xDD, 0xDD, 0xDD},
+	}
+
 	sut, _ := worker.NewShuffler(IterativeGenerator(data), context.Background())
 
 	//Act
@@ -68,9 +75,9 @@ func TestShufflerShouldAndAddOneBytesInOrderedWay(t *testing.T) {
 	//Assert
 	time.Sleep(100 * time.Millisecond)
 
-	for _, row := range data {
+	for j, row := range data {
 		for i, v := range row {
-			if v != 0x01 {
+			if v != copyOfData[j][i]+1 {
 				t.Fatalf("Expected all data to be 0x01 but got %d at position %d", v, i)
 			}
 		}
@@ -82,7 +89,7 @@ func Generator(data []byte) <-chan []byte {
 	channel := make(chan []byte, 1)
 
 	go func() {
-		//time.Sleep(1 * time.Millisecond)
+		time.Sleep(1 * time.Millisecond)
 		channel <- data
 	}()
 

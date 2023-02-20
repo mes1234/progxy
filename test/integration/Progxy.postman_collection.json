@@ -1,0 +1,34 @@
+{
+	"info": {
+		"_postman_id": "46429726-86af-42c5-ba02-603b098f9f29",
+		"name": "Progxy",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "1497019"
+	},
+	"item": [
+		{
+			"name": "Simple",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://127.0.0.1:9000/test/integration/index.html",
+					"protocol": "http",
+					"host": [
+						"127",
+						"0",
+						"0",
+						"1"
+					],
+					"port": "9000",
+					"path": [
+						"test",
+						"integration",
+						"index.html"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

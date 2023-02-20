@@ -16,8 +16,9 @@ type TcpAdapter interface {
 }
 
 type tcpAdapter struct {
-	listner  net.Listener
-	dialFunc DialFunc
+	listner       net.Listener
+	dialFunc      DialFunc
+	clientCounter int
 }
 
 type DialFunc func(network string, raddr string) (net.Conn, error)
@@ -27,8 +28,8 @@ type DnsLookupFunc func(host string) ([]net.IP, error)
 func (tcpA *tcpAdapter) start(clientsListner net.Listener, proxiedAddr string) {
 
 	tcpA.listner = clientsListner
-
 	tcpA.handle(proxiedAddr)
+
 }
 
 func (tcpA *tcpAdapter) handle(proxiedAddr string) {
@@ -39,6 +40,8 @@ func (tcpA *tcpAdapter) handle(proxiedAddr string) {
 		// connection to talk with client
 		clientConn, _ := tcpA.listner.Accept()
 
+		tcpA.clientCounter++
+		fmt.Printf("Start handling %v'th client\n", tcpA.clientCounter)
 		go start(tcpA, proxiedAddr, clientConn, ctx)
 	}
 }
@@ -79,7 +82,7 @@ func start(tcpA *tcpAdapter, proxiedAddr string, clientConn net.Conn, ctx contex
 // Should be run as goroutine otherwise will block
 func WaitToClose(who string, waiter *sync.WaitGroup, conn net.Conn, cancelFunc context.CancelFunc) {
 	waiter.Wait()
-	fmt.Printf("Closed connection by %v\n", who)
+	//fmt.Printf("Closed connection by %v\n", who)
 	conn.Close()
 	cancelFunc()
 }
@@ -99,7 +102,8 @@ func NewTcpAdaper(
 
 	// create tcpAdapter which will setup pipelines for clients
 	adapter := tcpAdapter{
-		dialFunc: dialFunc,
+		dialFunc:      dialFunc,
+		clientCounter: 0,
 	}
 
 	// bootstrap bounding and shuffling data between client and proxied

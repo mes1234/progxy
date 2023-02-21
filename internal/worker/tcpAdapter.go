@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/mes1234/progxy/internal/dto"
+	"github.com/sirupsen/logrus"
 )
 
 const bufferSize = 1024
@@ -19,6 +20,7 @@ type tcpAdapter struct {
 	listner       net.Listener
 	dialFunc      DialFunc
 	clientCounter int
+	logger        *logrus.Logger
 }
 
 type DialFunc func(network string, raddr string) (net.Conn, error)
@@ -41,48 +43,50 @@ func (tcpA *tcpAdapter) handle(proxiedAddr string) {
 		clientConn, _ := tcpA.listner.Accept()
 
 		tcpA.clientCounter++
-		fmt.Printf("Start handling %v'th client\n", tcpA.clientCounter)
+		tcpA.logger.WithField("counter", tcpA.clientCounter).Info("started handling client")
 		go start(tcpA, proxiedAddr, clientConn, ctx)
 	}
 }
 
 func start(tcpA *tcpAdapter, proxiedAddr string, clientConn net.Conn, ctx context.Context) {
 
-	localCtx, cancelFunc := context.WithCancel(ctx)
+	cancallableContext, cancelFunc := context.WithCancel(ctx)
+	logger := tcpA.logger
 
 	// connection to talk with proxied
 	proxiedConn, _ := tcpA.dialFunc("tcp", proxiedAddr)
 
 	// clientInChan allow to write to client
 	// clientOutChan gets data from client
-	clientInChan, clientOutChan, clientWg := CreateChannelFromReaderWriter("client", clientConn, localCtx)
+	clientInChan, clientOutChan, clientWg := CreateChannelFromReaderWriter("client", clientConn, logger, cancallableContext)
 
 	// proxiedInChan allow to write to proxied
 	// proxiedOutChan gets data from proxied
-	proxiedInChan, proxiedOutChan, proxiedWg := CreateChannelFromReaderWriter("proxied", proxiedConn, localCtx)
+	proxiedInChan, proxiedOutChan, proxiedWg := CreateChannelFromReaderWriter("proxied", proxiedConn, logger, cancallableContext)
 
 	//Shuffler which will process data from client -> proxied
-	clientShuffler, _ := NewShuffler(clientOutChan, localCtx)
+	clientShuffler, _ := NewShuffler(clientOutChan, cancallableContext)
 
 	// Shuffler which will process data from proxied -> client
-	proxiedShuffler, _ := NewShuffler(proxiedOutChan, localCtx)
+	proxiedShuffler, _ := NewShuffler(proxiedOutChan, cancallableContext)
 
 	// Pass data from client to proxied
-	//clientShuffler.Attach(CreateWriteToConsoleProcessorFunc("client -> proxied"))
+	clientShuffler.Attach(CreateWriteToConsoleProcessorFunc("client -> proxied", logger))
 	clientShuffler.Attach(CreateWriteToChannelProcessorFunc(proxiedInChan))
 
 	// Pass data from proxied to client
-	//proxiedShuffler.Attach(CreateWriteToConsoleProcessorFunc("proxied -> client"))
+	proxiedShuffler.Attach(CreateWriteToConsoleProcessorFunc("proxied -> client", logger))
+	proxiedShuffler.Attach(CreateMuddlingProcessorFunc())
 	proxiedShuffler.Attach(CreateWriteToChannelProcessorFunc(clientInChan))
 
-	go WaitToClose("client", clientWg, clientConn, cancelFunc)
-	go WaitToClose("proxied", proxiedWg, proxiedConn, cancelFunc)
+	go WaitToClose("client", clientWg, clientConn, logger, cancelFunc)
+	go WaitToClose("proxied", proxiedWg, proxiedConn, logger, cancelFunc)
 }
 
 // Should be run as goroutine otherwise will block
-func WaitToClose(who string, waiter *sync.WaitGroup, conn net.Conn, cancelFunc context.CancelFunc) {
+func WaitToClose(who string, waiter *sync.WaitGroup, conn net.Conn, logger *logrus.Logger, cancelFunc context.CancelFunc) {
 	waiter.Wait()
-	//fmt.Printf("Closed connection by %v\n", who)
+	logger.WithField("who", who).Info("Closed connection")
 	conn.Close()
 	cancelFunc()
 }
@@ -92,7 +96,8 @@ func NewTcpAdaper(
 	port int,
 	listenFunc ListenFunc,
 	dialFunc DialFunc,
-	dnsLookupFunc DnsLookupFunc) TcpAdapter {
+	dnsLookupFunc DnsLookupFunc,
+	logger *logrus.Logger) TcpAdapter {
 
 	// based on provided proxied address and port get address to proxied service
 	proxiedAddr := getProxiedAddr(proxied, dnsLookupFunc)
@@ -104,6 +109,7 @@ func NewTcpAdaper(
 	adapter := tcpAdapter{
 		dialFunc:      dialFunc,
 		clientCounter: 0,
+		logger:        logger,
 	}
 
 	// bootstrap bounding and shuffling data between client and proxied

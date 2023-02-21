@@ -2,9 +2,10 @@ package worker
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"sync"
+
+	"github.com/sirupsen/logrus"
 )
 
 // Should be used as goroutine otherwise it will never release thread
@@ -34,17 +35,18 @@ func readAndForward(out channelWrapper, reader io.Reader, wg *sync.WaitGroup, ct
 }
 
 // Should be used as goroutine otherwise it will never release thread
-func forwardToWriter(in channelWrapper, writer io.Writer, ctx context.Context) {
+func forwardToWriter(in channelWrapper, writer io.Writer, logger *logrus.Logger, ctx context.Context) {
 	for {
 		select {
+		case <-ctx.Done():
+			return
 		case data := <-in.channel:
 			n, err := writer.Write(data)
 			if err != nil {
-				fmt.Printf("read %v data and failed", n)
+				logger.WithField("data-read", n).Error("data send failed")
 				return
 			}
-		case <-ctx.Done():
-			return
+
 		}
 	}
 }
@@ -52,10 +54,8 @@ func forwardToWriter(in channelWrapper, writer io.Writer, ctx context.Context) {
 // CreateChannelFromReaderWriter
 // performs Read on rw and push it to out chan
 // retrieve from in chan and performs Write
-func CreateChannelFromReaderWriter(description string, rw io.ReadWriter, ctx context.Context) (in chan []byte, out chan []byte, wg *sync.WaitGroup) {
+func CreateChannelFromReaderWriter(description string, rw io.ReadWriter, logger *logrus.Logger, ctx context.Context) (in chan []byte, out chan []byte, wg *sync.WaitGroup) {
 
-	// TODO  how to create local without cancel ?
-	localContext, _ := context.WithCancel(ctx)
 	wg = &sync.WaitGroup{}
 	wg.Add(1)
 
@@ -69,10 +69,10 @@ func CreateChannelFromReaderWriter(description string, rw io.ReadWriter, ctx con
 	}
 
 	// Read data from Reader and push to channel
-	go readAndForward(outWrapper, rw, wg, localContext)
+	go readAndForward(outWrapper, rw, wg, ctx)
 
 	// Forward data from in channel to Writer
-	go forwardToWriter(inWrapper, rw, localContext)
+	go forwardToWriter(inWrapper, rw, logger, ctx)
 
 	return inWrapper.channel, outWrapper.channel, wg
 }

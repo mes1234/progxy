@@ -5,9 +5,15 @@ destinations:
         port:  5500
       port: 9000
       name: "simple HTTP server"
+      processors:
+       - console-print
+       - foward-to-client
   - dest2 :
       proxied:
         host: "127.0.0.1"
         port:  80
       port: 9001
       name: "IIS"
+      processors:
+       - console-print
+       - foward-to-client

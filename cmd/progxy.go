@@ -18,12 +18,12 @@ func main() {
 
 	adapters := make(map[string]worker.TcpAdapter)
 
-	log := cs.GetLogger()
+	logger := cs.GetLogger()
 
-	log.Debug("Got config ", len(destinations))
+	logger.Debug("Got config ", len(destinations))
 
 	for key, destination := range destinations {
-		adapters[key] = worker.NewTcpAdaper(destination.Proxied, destination.Port, net.Listen, net.Dial, net.LookupIP)
+		adapters[key] = worker.NewTcpAdaper(destination.Proxied, destination.Port, net.Listen, net.Dial, net.LookupIP, logger)
 	}
 
 	time.Sleep(1000 * time.Second)

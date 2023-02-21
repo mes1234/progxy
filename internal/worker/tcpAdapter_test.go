@@ -7,6 +7,7 @@ import (
 
 	"github.com/mes1234/progxy/internal/dto"
 	"github.com/mes1234/progxy/internal/worker"
+	"github.com/sirupsen/logrus"
 )
 
 func TestTcpAdapterShallShuffleDataFromProxiedToClient(t *testing.T) {
@@ -17,7 +18,7 @@ func TestTcpAdapterShallShuffleDataFromProxiedToClient(t *testing.T) {
 
 	valueToSendFromProxiedToClient := byte(0xAA)
 
-	_ = worker.NewTcpAdaper(dto.Proxied{}, 1111, generateListenFuncWithBuf(&bufOut), generateDialFuncWithValue(valueToSendFromProxiedToClient), dummydnsLookupFunc)
+	_ = worker.NewTcpAdaper(dto.Proxied{}, 1111, generateListenFuncWithBuf(&bufOut), generateDialFuncWithValue(valueToSendFromProxiedToClient), dummydnsLookupFunc, logrus.New())
 
 	//Act
 	// Allow to shuffling start

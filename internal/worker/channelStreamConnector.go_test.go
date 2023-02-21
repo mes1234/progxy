@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/mes1234/progxy/internal/worker"
+	"github.com/sirupsen/logrus"
 )
 
 func TestStreamShouldReadOneTimeAndPutItToOutChanTime(t *testing.T) {
@@ -19,7 +20,7 @@ func TestStreamShouldReadOneTimeAndPutItToOutChanTime(t *testing.T) {
 	dummyRW := newDummyStreamReadWriter(dataChunk)
 
 	//Act
-	_, outChan, _ := worker.CreateChannelFromReaderWriter("test", dummyRW, context.TODO())
+	_, outChan, _ := worker.CreateChannelFromReaderWriter("test", dummyRW, logrus.New(), context.TODO())
 
 	//Assert
 	data := <-outChan
@@ -43,7 +44,7 @@ func TestStreamShouldReadMoreThanOneTimeAndPutItToOutChanTime(t *testing.T) {
 	dummyRW := newDummyStreamReadWriter(dataChunk)
 
 	//Act
-	_, outChan, _ := worker.CreateChannelFromReaderWriter("test", dummyRW, context.TODO())
+	_, outChan, _ := worker.CreateChannelFromReaderWriter("test", dummyRW, logrus.New(), context.TODO())
 
 	time.Sleep(1 * time.Second)
 
@@ -69,7 +70,7 @@ func TestStreamShouldGetDataFromInChannelAndPassItToWriter(t *testing.T) {
 	}
 	//Act
 	dummyRW := newDummyStreamReadWriterWithAssertions(dataChunk, t)
-	inChan, _, _ := worker.CreateChannelFromReaderWriter("test", dummyRW, context.TODO())
+	inChan, _, _ := worker.CreateChannelFromReaderWriter("test", dummyRW, logrus.New(), context.TODO())
 
 	for _, dataChunkRow := range dataChunk {
 		inChan <- dataChunkRow

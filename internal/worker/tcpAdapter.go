@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/mes1234/progxy/internal/dto"
 	"github.com/sirupsen/logrus"
@@ -27,18 +28,15 @@ type DialFunc func(network string, raddr string) (net.Conn, error)
 type ListenFunc func(network, address string) (net.Listener, error)
 type DnsLookupFunc func(host string) ([]net.IP, error)
 
-func (tcpA *tcpAdapter) start(clientsListner net.Listener, proxiedAddr string) {
+func (tcpA *tcpAdapter) start(clientsListner net.Listener, proxiedAddr string, ctx context.Context) {
 
 	tcpA.listner = clientsListner
-	tcpA.handle(proxiedAddr)
+	tcpA.handle(proxiedAddr, ctx)
 
 }
 
-func (tcpA *tcpAdapter) handle(proxiedAddr string) {
+func (tcpA *tcpAdapter) handle(proxiedAddr string, ctx context.Context) {
 	for {
-		// create context to close this proxy
-		ctx := context.Background()
-
 		// connection to talk with client
 		clientConn, _ := tcpA.listner.Accept()
 
@@ -76,7 +74,7 @@ func start(tcpA *tcpAdapter, proxiedAddr string, clientConn net.Conn, ctx contex
 
 	// Pass data from proxied to client
 	proxiedShuffler.Attach(CreateWriteToConsoleProcessorFunc("proxied -> client", logger))
-	proxiedShuffler.Attach(CreateMuddlingProcessorFunc())
+	//proxiedShuffler.Attach(CreateMuddlingProcessorFunc())
 	proxiedShuffler.Attach(CreateWriteToChannelProcessorFunc(clientInChan))
 
 	go WaitToClose("client", clientWg, clientConn, logger, cancelFunc)
@@ -97,10 +95,13 @@ func NewTcpAdaper(
 	listenFunc ListenFunc,
 	dialFunc DialFunc,
 	dnsLookupFunc DnsLookupFunc,
-	logger *logrus.Logger) TcpAdapter {
+	logger *logrus.Logger,
+	ctx context.Context) TcpAdapter {
 
 	// based on provided proxied address and port get address to proxied service
 	proxiedAddr := getProxiedAddr(proxied, dnsLookupFunc)
+
+	time.Sleep(1 * time.Second)
 
 	// start accepting clients on provided common port
 	listen, _ := listenFunc("tcp", "localhost"+":"+fmt.Sprint(port))
@@ -113,7 +114,14 @@ func NewTcpAdaper(
 	}
 
 	// bootstrap bounding and shuffling data between client and proxied
-	go adapter.start(listen, proxiedAddr)
+	go adapter.start(listen, proxiedAddr, ctx)
+
+	// wait to close listner when context closes
+	go func() {
+		//TODO it is not triggered
+		<-ctx.Done()
+		listen.Close()
+	}()
 
 	return &adapter
 }

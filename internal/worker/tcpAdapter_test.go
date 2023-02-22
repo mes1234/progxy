@@ -1,6 +1,7 @@
 package worker_test
 
 import (
+	"context"
 	"net"
 	"testing"
 	"time"
@@ -18,7 +19,7 @@ func TestTcpAdapterShallShuffleDataFromProxiedToClient(t *testing.T) {
 
 	valueToSendFromProxiedToClient := byte(0xAA)
 
-	_ = worker.NewTcpAdaper(dto.Proxied{}, 1111, generateListenFuncWithBuf(&bufOut), generateDialFuncWithValue(valueToSendFromProxiedToClient), dummydnsLookupFunc, logrus.New())
+	_ = worker.NewTcpAdaper(dto.Proxied{}, 1111, generateListenFuncWithBuf(&bufOut), generateDialFuncWithValue(valueToSendFromProxiedToClient), dummydnsLookupFunc, logrus.New(), context.TODO())
 
 	//Act
 	// Allow to shuffling start

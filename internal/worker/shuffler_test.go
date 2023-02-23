@@ -12,7 +12,7 @@ func TestShufflerShouldZeroAllBytes(t *testing.T) {
 
 	//Arrange
 	data := []byte{0xFF}
-	sut, _ := worker.NewShuffler(Generator(data), context.Background())
+	sut := worker.NewShuffler(Generator(data), context.Background())
 
 	//Act
 
@@ -32,7 +32,7 @@ func TestShufflerShouldZeroAllAndAddOneBytes(t *testing.T) {
 
 	//Arrange
 	data := []byte{0xFF}
-	sut, _ := worker.NewShuffler(Generator(data), context.Background())
+	sut := worker.NewShuffler(Generator(data), context.Background())
 
 	//Act
 
@@ -66,7 +66,7 @@ func TestShufflerShouldAndAddOneBytesInOrderedWay(t *testing.T) {
 		{0xDD, 0xDD, 0xDD, 0xDD, 0xDD},
 	}
 
-	sut, _ := worker.NewShuffler(IterativeGenerator(data), context.Background())
+	sut := worker.NewShuffler(IterativeGenerator(data), context.Background())
 
 	//Act
 

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"sync"
-	"time"
 
 	"github.com/mes1234/progxy/internal/dto"
 	"github.com/sirupsen/logrus"
@@ -28,21 +27,37 @@ type DialFunc func(network string, raddr string) (net.Conn, error)
 type ListenFunc func(network, address string) (net.Listener, error)
 type DnsLookupFunc func(host string) ([]net.IP, error)
 
-func (tcpA *tcpAdapter) start(clientsListner net.Listener, proxiedAddr string, ctx context.Context) {
+func (tcpA *tcpAdapter) start(clientsListner net.Listener, proxiedAddr string, port int, ctx context.Context) {
 
 	tcpA.listner = clientsListner
+
+	tcpA.logger.WithFields(logrus.Fields{
+		"proxied": proxiedAddr,
+		"port":    port,
+	}).Info("tcp Adapter started")
+
 	tcpA.handle(proxiedAddr, ctx)
 
 }
 
 func (tcpA *tcpAdapter) handle(proxiedAddr string, ctx context.Context) {
 	for {
-		// connection to talk with client
-		clientConn, _ := tcpA.listner.Accept()
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			{
+				// connection to talk with client
+				clientConn, err := tcpA.listner.Accept()
 
-		tcpA.clientCounter++
-		tcpA.logger.WithField("counter", tcpA.clientCounter).Info("started handling client")
-		go start(tcpA, proxiedAddr, clientConn, ctx)
+				if err == nil {
+					tcpA.clientCounter++
+					tcpA.logger.WithField("counter", tcpA.clientCounter).Info("started handling client")
+					go start(tcpA, proxiedAddr, clientConn, ctx)
+				}
+
+			}
+		}
 	}
 }
 
@@ -63,10 +78,10 @@ func start(tcpA *tcpAdapter, proxiedAddr string, clientConn net.Conn, ctx contex
 	proxiedInChan, proxiedOutChan, proxiedWg := CreateChannelFromReaderWriter("proxied", proxiedConn, logger, cancallableContext)
 
 	//Shuffler which will process data from client -> proxied
-	clientShuffler, _ := NewShuffler(clientOutChan, cancallableContext)
+	clientShuffler := NewShuffler(clientOutChan, cancallableContext)
 
 	// Shuffler which will process data from proxied -> client
-	proxiedShuffler, _ := NewShuffler(proxiedOutChan, cancallableContext)
+	proxiedShuffler := NewShuffler(proxiedOutChan, cancallableContext)
 
 	// Pass data from client to proxied
 	clientShuffler.Attach(CreateWriteToConsoleProcessorFunc("client -> proxied", logger))
@@ -85,7 +100,9 @@ func start(tcpA *tcpAdapter, proxiedAddr string, clientConn net.Conn, ctx contex
 func WaitToClose(who string, waiter *sync.WaitGroup, conn net.Conn, logger *logrus.Logger, cancelFunc context.CancelFunc) {
 	waiter.Wait()
 	logger.WithField("who", who).Info("Closed connection")
-	conn.Close()
+	if conn != nil {
+		conn.Close()
+	}
 	cancelFunc()
 }
 
@@ -101,8 +118,6 @@ func NewTcpAdaper(
 	// based on provided proxied address and port get address to proxied service
 	proxiedAddr := getProxiedAddr(proxied, dnsLookupFunc)
 
-	time.Sleep(1 * time.Second)
-
 	// start accepting clients on provided common port
 	listen, _ := listenFunc("tcp", "localhost"+":"+fmt.Sprint(port))
 
@@ -114,16 +129,24 @@ func NewTcpAdaper(
 	}
 
 	// bootstrap bounding and shuffling data between client and proxied
-	go adapter.start(listen, proxiedAddr, ctx)
+	go adapter.start(listen, proxiedAddr, port, ctx)
 
 	// wait to close listner when context closes
-	go func() {
-		//TODO it is not triggered
-		<-ctx.Done()
-		listen.Close()
-	}()
+	go waitToClose(proxied, port, listen, logger, ctx)
 
 	return &adapter
+}
+
+func waitToClose(proxied dto.Proxied, port int, listen net.Listener, logger *logrus.Logger, ctx context.Context) {
+	<-ctx.Done()
+	if listen != nil {
+		listen.Close()
+	}
+
+	logger.WithFields(logrus.Fields{
+		"proxied": fmt.Sprintf("%v:%v", proxied.Host, proxied.Port),
+		"port":    port,
+	}).Info("tcp Adapter finished")
 }
 
 func getProxiedAddr(proxied dto.Proxied, dnsLookupFunc DnsLookupFunc) string {

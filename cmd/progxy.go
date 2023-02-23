@@ -3,44 +3,52 @@ package main
 import (
 	"context"
 	"net"
-	"time"
+	"os"
+	"os/signal"
+	"syscall"
 
-	"github.com/fsnotify/fsnotify"
 	"github.com/mes1234/progxy/internal/worker"
 	"github.com/mes1234/progxy/service/configuration"
 )
 
 func main() {
 
+	// Create main context
 	mainCtx := context.Background()
+
+	appCtx, appCancel := context.WithCancel(mainCtx)
+
+	// appCtx, _ = context.WithDeadline(appCtx, time.Now().Add(time.Second*10))
+
+	// exit procedure
+	exit(appCancel)
 
 	cs := configuration.NewConfigurationService()
 
-	runCtx, cancelFunc := context.WithCancel(mainCtx)
+	cs.Init(configuration.DefaultPath, configuration.NoActionCallback)
 
-	cs.Init(configuration.DefaultPath, reloadFuncGenerator(cs, cancelFunc, mainCtx))
+	cs.GetLogger().Info("PROGXY bootstrap")
 
-	logger := cs.GetLogger()
-
-	logger.Info("PROGXY bootstrap")
-
-	run(cs, runCtx, func() {})
+	run(cs, appCtx)
 
 	<-mainCtx.Done()
-
 }
 
-func run(cs configuration.ConfigurationService, ctx context.Context, cancelPrior context.CancelFunc) {
+func exit(appCancel context.CancelFunc) {
+	c := make(chan os.Signal, 10)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-c
+		appCancel()
+		os.Exit(0)
+	}()
+}
 
-	cancelPrior()
-
-	time.Sleep(1 * time.Second)
+func run(cs configuration.ConfigurationService, ctx context.Context) {
 
 	destinations := cs.GetDestinations()
 
 	logger := cs.GetLogger()
-
-	logger.Debug("Got config ", len(destinations))
 
 	logger.Info("Started Progxy HAVE FUN")
 
@@ -48,22 +56,5 @@ func run(cs configuration.ConfigurationService, ctx context.Context, cancelPrior
 
 	for key, destination := range destinations {
 		adapters[key] = worker.NewTcpAdaper(destination.Proxied, destination.Port, net.Listen, net.Dial, net.LookupIP, logger, ctx)
-	}
-}
-
-func reloadFuncGenerator(cs configuration.ConfigurationService, cancelPrior context.CancelFunc, mainCtx context.Context) func(e fsnotify.Event) {
-
-	return func(e fsnotify.Event) {
-
-		runCtx, cancelFunc := context.WithCancel(mainCtx)
-
-		cs.Init(configuration.DefaultPath, reloadFuncGenerator(cs, cancelFunc, mainCtx))
-
-		logger := cs.GetLogger()
-
-		logger.Info("PROGXY bootstrap")
-
-		run(cs, runCtx, func() {})
-
 	}
 }

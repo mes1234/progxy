@@ -1,1 +1,1 @@
-newman run Progxy.postman_collection.json -n 100
+newman run Progxy.postman_collection.json -n 1

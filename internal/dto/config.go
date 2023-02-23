@@ -5,10 +5,9 @@ type Config struct {
 }
 
 type Destination struct {
-	Proxied    Proxied  `mapstructure:"proxied"`
-	Port       int      `mapstructure:"port"`
-	Name       string   `mapstructure:"name"`
-	Processors []string `mapstructure:"Processors"`
+	Proxied Proxied `mapstructure:"proxied"`
+	Port    int     `mapstructure:"port"`
+	Name    string  `mapstructure:"name"`
 }
 
 type Proxied struct {

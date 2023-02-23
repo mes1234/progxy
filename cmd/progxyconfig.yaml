@@ -3,17 +3,11 @@ destinations:
       proxied:
         host: "127.0.0.1"
         port:  5500
-      port: 9203
+      port: 9100
       name: "simple HTTP server "
-      processors:
-       - console-print
-       - foward-to-client
   - dest2 :
       proxied:
         host: "127.0.0.1"
         port:  80
-      port: 9205
+      port: 9200
       name: "IIS"
-      processors:
-       - console-print
-       - foward-to-client

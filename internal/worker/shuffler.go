@@ -12,9 +12,7 @@ type Shufller interface {
 }
 
 type shuffler struct {
-	processors    []ProcessorFunc
-	myContext     context.Context
-	parentContext context.Context
+	processors []ProcessorFunc
 }
 
 func (s *shuffler) Attach(processor ProcessorFunc) error {
@@ -35,29 +33,25 @@ func (s *shuffler) processChunk(data []byte) {
 	}
 }
 
-func (s *shuffler) start(input <-chan []byte) {
+func (s *shuffler) start(input <-chan []byte, ctx context.Context) {
 	for {
 		select {
 		case data := <-input:
 			s.processChunk(data)
-		case <-s.myContext.Done():
+		case <-ctx.Done():
 			return
 		}
 	}
 
 }
 
-func NewShuffler(input <-chan []byte, ctx context.Context) (Shufller, context.CancelFunc) {
-
-	myContext, myCancelFunc := context.WithCancel(ctx)
+func NewShuffler(input <-chan []byte, ctx context.Context) Shufller {
 
 	s := shuffler{
-		processors:    make([]ProcessorFunc, 0),
-		parentContext: ctx,
-		myContext:     myContext,
+		processors: make([]ProcessorFunc, 0),
 	}
 
-	go s.start(input)
+	go s.start(input, ctx)
 
-	return &s, myCancelFunc
+	return &s
 }

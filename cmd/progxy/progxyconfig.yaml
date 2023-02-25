@@ -1,0 +1,20 @@
+destinations:
+  - dest1 :
+      proxied:
+        host: "127.0.0.1"
+        port:  5500
+      port: 9100
+      name: "simple HTTP server "
+  - dest2 :
+      proxied:
+        host: "127.0.0.1"
+        port:  80
+      port: 9200
+      name: "IIS"
+  - dest2 :
+      proxied:
+        host: "127.0.0.1"
+        port:  8080
+      port: 9700
+      name: "gin"  
+  
